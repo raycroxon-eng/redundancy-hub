@@ -1,0 +1,732 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Redundancy Hub</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="theme-color" content="#123a3a">
+<meta name="description" content="Track your redundancy package, job applications and candidate materials in one place.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<style>
+/* Layout: a working ledger — sticky masthead with tabs on desktop, bottom tab bar on phones; content in a single 960px column. */
+:root{
+  --paper:#f3f6f5; --surface:#ffffff; --ink:#15242a; --muted:#5a6b70; --line:#d6dfdd;
+  --accent:#0f6464; --accent-ink:#ffffff; --accent-soft:#dcecea; --mast:#123a3a; --mast-ink:#eaf3f1;
+  --gold:#b7791f; --good:#2f7d4f; --warn:#a86512; --bad:#b03a35; --info:#2c5f9e;
+  --f-display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --f-body:"Source Sans 3", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --f-mono:"JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --paper:#0f1719; --surface:#162226; --ink:#e3ecea; --muted:#94a7a8; --line:#2a3a3e;
+  --accent:#4fb3a9; --accent-ink:#06201e; --accent-soft:#1c3533; --mast:#0b2a2a; --mast-ink:#e3ecea;
+  --gold:#e0a84a; --good:#5fbf86; --warn:#e3a14f; --bad:#e57a73; --info:#7aa9e6; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --paper:#0f1719; --surface:#162226; --ink:#e3ecea; --muted:#94a7a8; --line:#2a3a3e;
+  --accent:#4fb3a9; --accent-ink:#06201e; --accent-soft:#1c3533; --mast:#0b2a2a; --mast-ink:#e3ecea;
+  --gold:#e0a84a; --good:#5fbf86; --warn:#e3a14f; --bad:#e57a73; --info:#7aa9e6; color-scheme:dark}
+
+*{box-sizing:border-box}
+html,body{background:var(--paper);color:var(--ink)}
+body{font-family:var(--f-body);font-size:16px;line-height:1.5;margin:0}
+h1,h2,h3{font-family:var(--f-display);line-height:1.15;text-wrap:balance;margin:0}
+h1{font-size:clamp(1.7rem,4vw,2.4rem);font-weight:700}
+h2{font-size:1.35rem;font-weight:700}
+h3{font-size:1.05rem;font-weight:700}
+p{margin:0}
+a{color:var(--accent)}
+.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.eyebrow{font-size:.75rem;letter-spacing:.08em;text-transform:uppercase;font-weight:700;color:var(--muted)}
+:focus-visible{outline:3px solid var(--gold);outline-offset:2px;border-radius:4px}
+
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--mast)}
+.mast{position:sticky;top:env(safe-area-inset-top,0px);z-index:9;background:var(--mast);color:var(--mast-ink);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.mast-in{max-width:960px;margin:0 auto;display:flex;align-items:center;gap:24px;min-height:60px}
+.brand{display:flex;align-items:center;gap:10px;font-family:var(--f-display);font-weight:700;font-size:1.15rem;white-space:nowrap}
+.brand svg{flex:none}
+.tabs{display:flex;gap:4px;margin-left:auto}
+.tab{appearance:none;border:0;background:transparent;color:inherit;font:600 .95rem var(--f-body);padding:8px 14px;border-radius:999px;cursor:pointer;display:flex;align-items:center;gap:8px;opacity:.78}
+.tab:hover{opacity:1;background:rgba(255,255,255,.08)}
+.tab[aria-current="page"]{opacity:1;background:var(--mast-ink);color:var(--mast)}
+.tab svg{width:18px;height:18px}
+
+main{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 48px}
+.view{max-width:960px;margin:0 auto;display:flex;flex-direction:column;gap:28px}
+.head{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
+.head > div{display:flex;flex-direction:column;gap:6px;min-width:0}
+.lede{color:var(--muted);max-width:62ch}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:20px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:16px}
+.btn{appearance:none;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:600 .92rem var(--f-body);padding:9px 14px;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;text-decoration:none}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.danger{color:var(--bad)}
+.btn.small{padding:5px 10px;font-size:.85rem}
+.btn.icon{padding:5px 9px;min-width:32px;justify-content:center}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+
+.example-note{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;background:var(--accent-soft);border-radius:8px;padding:10px 14px;font-size:.92rem}
+
+/* Home ledger */
+.ledger{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.cell{background:var(--surface);padding:16px 18px;display:flex;flex-direction:column;gap:4px}
+.cell .big{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-size:1.5rem;font-weight:600}
+.bar{display:flex;height:12px;border-radius:6px;overflow:hidden;background:var(--line)}
+.bar span{display:block;height:100%}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:.88rem}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.list{display:flex;flex-direction:column}
+.list > *{padding:10px 0;border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:12px;align-items:center}
+.list > *:first-child{border-top:0}
+
+/* Status pills */
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:.8rem;font-weight:700;padding:3px 10px;border-radius:999px;white-space:nowrap;border:1px solid currentColor}
+.pill::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.s-Interested{color:var(--muted)} .s-Applied{color:var(--info)} .s-Interviewing{color:var(--gold)}
+.s-Offer{color:var(--good)} .s-Rejected{color:var(--bad)} .s-Withdrawn{color:var(--muted)}
+
+/* Jobs */
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.chip{appearance:none;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:600 .85rem var(--f-body);padding:5px 12px;border-radius:999px;cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.chip .n{font-family:var(--f-mono);font-size:.78rem;opacity:.7;margin-left:4px}
+.search{flex:1 1 200px;min-width:0;padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);font:inherit}
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--surface)}
+table{width:100%;border-collapse:collapse;font-size:.95rem}
+th{text-align:left;font-size:.75rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:12px 14px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:12px 14px;border-bottom:1px solid var(--line);vertical-align:middle}
+tr:last-child td{border-bottom:0}
+td.co{font-weight:700}
+td .sub{display:block;font-weight:400;color:var(--muted);font-size:.85rem}
+.stepper{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.stepper button{appearance:none;border:0;background:transparent;color:var(--ink);width:30px;height:30px;font:600 1rem var(--f-mono);cursor:pointer}
+.stepper button:hover{background:var(--accent-soft)}
+.stepper output{min-width:28px;text-align:center;font-family:var(--f-mono);font-weight:600}
+.cards{display:none;flex-direction:column;gap:12px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:10px}
+.card-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.card-top > div{min-width:0}
+.urlcell a{word-break:break-all}
+.empty{padding:32px 20px;text-align:center;color:var(--muted);display:flex;flex-direction:column;gap:10px;align-items:center}
+@media (max-width:720px){.tablewrap.jobs{display:none}.cards{display:flex}}
+
+/* Forms / dialog */
+dialog{border:1px solid var(--line);border-radius:14px;background:var(--surface);color:var(--ink);padding:0;width:min(560px,calc(100vw - 32px));max-height:calc(100dvh - 32px)}
+dialog::backdrop{background:rgba(8,20,22,.55)}
+dialog form{padding:22px;display:flex;flex-direction:column;gap:16px}
+.fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.fields .full{grid-column:1/-1}
+@media (max-width:480px){.fields{grid-template-columns:1fr}}
+label{display:flex;flex-direction:column;gap:5px;font-size:.85rem;font-weight:600;color:var(--muted)}
+input,select,textarea{font:inherit;font-size:1rem;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:9px 11px;width:100%;min-width:0}
+textarea{min-height:80px;resize:vertical}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:0;border-color:var(--accent)}
+.dlg-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}
+.dlg-actions .left{margin-right:auto}
+.confirm{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:.9rem;color:var(--bad);font-weight:600}
+
+/* Package */
+.pkg td input{background:transparent;border-color:transparent;padding:6px 8px}
+.pkg td input:hover{border-color:var(--line)}
+.pkg td input:focus{background:var(--paper)}
+.pkg td.money input{text-align:right;font-family:var(--f-mono);font-variant-numeric:tabular-nums;min-width:110px}
+.pkg td.diff{text-align:right;white-space:nowrap}
+.pkg th.r{text-align:right}
+.pkg tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
+.pkg select{padding:6px 8px;background:transparent;border-color:transparent;min-width:150px}
+.pkg select:hover{border-color:var(--line)}
+.calc{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,160px),1fr));gap:12px}
+.calc-out{display:flex;flex-wrap:wrap;gap:8px 24px;padding-top:12px;border-top:1px dashed var(--line)}
+.calc-out div{display:flex;flex-direction:column}
+.calc-out strong{font-family:var(--f-mono);font-size:1.2rem}
+.note{font-size:.88rem;color:var(--muted);max-width:70ch}
+
+.docs{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,260px),1fr));gap:12px}
+.doc{border:1px solid var(--line);border-radius:var(--r);padding:14px;display:flex;flex-direction:column;gap:8px;background:var(--surface)}
+.doc .type{font-family:var(--f-mono);font-size:.75rem;text-transform:uppercase;letter-spacing:.06em;color:var(--accent)}
+.doc p{font-size:.92rem;color:var(--muted)}
+.doc .row{margin-top:auto}
+.links{display:flex;flex-direction:column}
+.links a{display:flex;justify-content:space-between;gap:12px;padding:12px 0;border-top:1px solid var(--line);text-decoration:none;color:var(--ink)}
+.links a:first-child{border-top:0}
+.links a span:last-child{color:var(--muted);font-size:.9rem;text-align:right}
+.links a:hover span:first-child{color:var(--accent);text-decoration:underline}
+
+.about p+p{margin-top:10px}
+.about{max-width:68ch}
+.backup textarea{font-family:var(--f-mono);font-size:.8rem;min-height:140px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--paper);padding:10px 16px;border-radius:8px;font-weight:600;z-index:20;box-shadow:0 6px 20px rgba(0,0,0,.2)}
+
+/* Sync badge */
+.sync{appearance:none;border:1px solid rgba(255,255,255,.2);background:transparent;color:inherit;font:600 .8rem var(--f-body);padding:5px 11px;border-radius:999px;display:inline-flex;align-items:center;gap:7px;cursor:pointer;white-space:nowrap}
+.sync:hover{background:rgba(255,255,255,.08)}
+.sync::before{content:"";width:8px;height:8px;border-radius:50%;background:#9fb3b3}
+.sync[data-s="synced"]::before{background:#5fbf86}
+.sync[data-s="syncing"]::before,.sync[data-s="connecting"]::before{background:#e0a84a}
+.sync[data-s="error"]::before{background:#e57a73}
+.sync[data-s="offline"]::before,.sync[data-s="signedout"]::before{background:#e3a14f}
+#authForm .row{grid-column:1/-1}
+
+/* Phone: tabs move to a bottom bar */
+@media (max-width:720px){
+  .sync{margin-left:auto}
+  .tabs{position:fixed;left:0;right:0;bottom:0;margin:0;background:var(--mast);justify-content:space-around;
+    padding:6px max(8px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-left,0px));
+    border-top:1px solid rgba(255,255,255,.08);z-index:9}
+  .tab{flex-direction:column;gap:2px;font-size:.72rem;padding:6px 10px;border-radius:10px}
+  .tab[aria-current="page"]{background:rgba(255,255,255,.14);color:var(--mast-ink)}
+  main{padding-bottom:calc(96px + env(safe-area-inset-bottom,0px))}
+}
+@media (prefers-reduced-motion:no-preference){.view{animation:in .25s ease-out}@keyframes in{from{opacity:.4;transform:translateY(4px)}to{opacity:1;transform:none}}}
+</style>
+
+</head>
+<body>
+
+<header class="mast">
+  <div class="mast-in">
+    <div class="brand">
+      <svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="currentColor" opacity=".14"/><path d="M8 22 L14 15 L18 19 L25 10" stroke="currentColor" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/><circle cx="25" cy="10" r="2.6" fill="#e0a84a"/></svg>
+      Redundancy Hub
+    </div>
+    <nav class="tabs" aria-label="Sections">
+      <button class="tab" data-view="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Home</button>
+      <button class="tab" data-view="jobs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Jobs Tracker</button>
+      <button class="tab" data-view="resources"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h10l6 6v10a1 1 0 0 1-1 1H4z"/><path d="M14 4v6h6M8 14h8M8 17h5"/></svg>Resources</button>
+      <button class="tab" data-view="about"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.01"/></svg>About</button>
+    </nav>
+    <button class="sync" id="syncBadge" data-s="off" title="Cloud sync status">Device only</button>
+  </div>
+</header>
+
+<main id="main"></main>
+
+<dialog id="jobDlg" aria-labelledby="jobDlgTitle">
+  <form id="jobForm" method="dialog">
+    <h2 id="jobDlgTitle">Add job</h2>
+    <div class="fields">
+      <label>Company<input id="j-company" required autocomplete="off"></label>
+      <label>Role<input id="j-role" required autocomplete="off"></label>
+      <label>Status<select id="j-status"></select></label>
+      <label>Interviews<input id="j-interviews" type="number" min="0" step="1" value="0"></label>
+      <label>Date applied<input id="j-date" type="date"></label>
+      <label>Contact<input id="j-contact" placeholder="Recruiter or hiring manager" autocomplete="off"></label>
+      <label class="full">Job URL<input id="j-url" type="url" placeholder="https://"></label>
+      <label class="full">Notes<textarea id="j-notes" placeholder="Next step, salary range, who referred you…"></textarea></label>
+    </div>
+    <div class="dlg-actions">
+      <span class="left" id="j-delwrap"></span>
+      <button type="button" class="btn" id="j-cancel">Cancel</button>
+      <button type="submit" class="btn primary" id="j-save">Save job</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="docDlg" aria-labelledby="docDlgTitle">
+  <form id="docForm" method="dialog">
+    <h2 id="docDlgTitle">Add item</h2>
+    <div class="fields">
+      <label>Title<input id="d-title" required autocomplete="off"></label>
+      <label>Type<select id="d-type"></select></label>
+      <label class="full">Link<input id="d-url" type="url" placeholder="Google Drive, OneDrive or web link"></label>
+      <label class="full">Notes<textarea id="d-notes" placeholder="Version, who it's tailored for, when to use it"></textarea></label>
+    </div>
+    <div class="dlg-actions">
+      <span class="left" id="d-delwrap"></span>
+      <button type="button" class="btn" id="d-cancel">Cancel</button>
+      <button type="submit" class="btn primary">Save item</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+(function(){
+"use strict";
+const KEY = "redundancy-hub.v1";
+const STATUSES = ["Interested","Applied","Interviewing","Offer","Rejected","Withdrawn"];
+const ACTIVE = ["Interested","Applied","Interviewing","Offer"];
+const DOC_TYPES = ["CV","Cover letter","LinkedIn","Reference","Pitch / summary","Portfolio","Other"];
+const COMPONENTS = ["Redundancy pay","Notice in lieu","Annual leave","Long service leave","Bonus / commission","Ex gratia","Outplacement","Other"];
+// ATO 2026–27 genuine redundancy tax-free limits and ETP cap (ato.gov.au key superannuation rates and thresholds)
+const ATO = {year:"2026–27", base:13598, perYear:6801, etpCap:270000};
+
+const uid = () => Math.random().toString(36).slice(2,10);
+const today = () => new Date().toISOString().slice(0,10);
+
+function sample(){
+  return {
+    examples:true,
+    jobs:[
+      {id:uid(),company:"Northwind Software",role:"VP Solutions Consulting, APJ",status:"Interviewing",interviews:2,date:"2026-10-06",contact:"Priya (Talent)",url:"https://example.com/jobs/vp-sc-apj",notes:"Panel with CRO next week. Range discussed: confirm.",example:true},
+      {id:uid(),company:"Harbour Health",role:"Head of Digital Transformation",status:"Applied",interviews:0,date:"2026-10-20",contact:"",url:"https://example.com/careers/hdt",notes:"Applied via referral.",example:true},
+      {id:uid(),company:"Tasman Cloud",role:"GM Customer Success, ANZ",status:"Offer",interviews:4,date:"2026-09-15",contact:"James (Hiring manager)",url:"https://example.com/roles/gm-cs",notes:"Written offer due Friday.",example:true},
+      {id:uid(),company:"Kestrel Analytics",role:"Director, Presales APAC",status:"Rejected",interviews:1,date:"2026-09-02",contact:"",url:"",notes:"Went with internal candidate.",example:true},
+      {id:uid(),company:"Southern Cross Bank",role:"Chief Automation Officer",status:"Interested",interviews:0,date:"",contact:"",url:"https://example.com/jobs/cao",notes:"Closes 14 Nov.",example:true}
+    ],
+    pkg:{years:13, rows:[
+      {id:uid(),kind:"Redundancy pay",label:"Redundancy pay (12 weeks)",gross:72000,received:72000,example:true},
+      {id:uid(),kind:"Notice in lieu",label:"Payment in lieu of notice",gross:30000,received:20100,example:true},
+      {id:uid(),kind:"Annual leave",label:"Accrued annual leave (18 days)",gross:21600,received:14472,example:true},
+      {id:uid(),kind:"Long service leave",label:"Long service leave",gross:52000,received:35880,example:true},
+      {id:uid(),kind:"Bonus / commission",label:"Pro-rata bonus",gross:25000,received:0,example:true}
+    ]},
+    docs:[
+      {id:uid(),title:"CV — Executive (2 pages)",type:"CV",url:"",notes:"Master version. Tailor the summary per role.",updated:"2026-10-18",example:true},
+      {id:uid(),title:"Cover letter — GTM leadership",type:"Cover letter",url:"",notes:"For VP Sales / GM roles.",updated:"2026-10-12",example:true},
+      {id:uid(),title:"Referees",type:"Reference",url:"",notes:"Two former managers, one customer exec. Ask before each use.",updated:"2026-10-01",example:true},
+      {id:uid(),title:"60-second pitch",type:"Pitch / summary",url:"",notes:"Why now, what I'm looking for, three proof points.",updated:"2026-10-25",example:true}
+    ]
+  };
+}
+
+let state;
+function load(){
+  try{ const raw = localStorage.getItem(KEY); if(raw){ state = JSON.parse(raw); } }catch(e){}
+  if(!state || !state.jobs) state = sample();
+  state.pkg = state.pkg || {years:0,rows:[]}; state.docs = state.docs || [];
+}
+function saveLocal(){ try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){} }
+function save(){ state.updatedAt = Date.now(); saveLocal(); schedulePush(); }
+function normalise(d){ d = d || {}; d.jobs = Array.isArray(d.jobs)?d.jobs:[]; d.pkg = d.pkg || {years:0,rows:[]}; d.pkg.rows = d.pkg.rows || []; d.docs = d.docs || []; return d; }
+
+/* ---------- Cloud sync (Supabase) ---------- */
+const CFG = window.HUB_CONFIG || {};
+const configured = !!(CFG.supabaseUrl && CFG.supabaseKey && !/YOUR-/.test(CFG.supabaseUrl + CFG.supabaseKey));
+const cloud = {client:null, user:null, status:configured?"connecting":"off", msg:"", timer:null, dirty:false, last:null};
+const BADGE = {off:"Device only", unavailable:"Device only", connecting:"Connecting…", signedout:"Sign in to sync", syncing:"Syncing…", synced:"Saved", offline:"Offline", error:"Sync error"};
+
+function setStatus(s, msg){
+  if(s) cloud.status = s; cloud.msg = msg || "";
+  if(s === "synced") cloud.last = new Date();
+  const b = document.getElementById("syncBadge");
+  if(b){ b.dataset.s = cloud.status; b.textContent = BADGE[cloud.status] || "Device only"; }
+  const line = document.getElementById("syncLine"); if(line) line.textContent = statusText();
+}
+function statusText(){
+  switch(cloud.status){
+    case "synced": return `Last saved to your database at ${cloud.last.toLocaleTimeString("en-AU",{hour:"numeric",minute:"2-digit"})}.`;
+    case "syncing": return "Syncing…";
+    case "offline": return "You're offline. Changes are saved on this device and will upload when you reconnect.";
+    case "error": return `Couldn't save to your database (${cloud.msg}). Your changes are safe on this device. Select Sync now to try again.`;
+    default: return "";
+  }
+}
+async function cloudInit(){
+  if(!configured){ setStatus("off"); return; }
+  if(!window.supabase || !location.protocol.startsWith("http")){ setStatus("unavailable"); paintSync(); return; }
+  try{ cloud.client = window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseKey, {auth:{persistSession:true, autoRefreshToken:true}}); }
+  catch(e){ setStatus("unavailable"); paintSync(); return; }
+  cloud.client.auth.onAuthStateChange((ev, session)=>{
+    const prev = cloud.user && cloud.user.id; cloud.user = session ? session.user : null;
+    if(ev === "INITIAL_SESSION" || (cloud.user && cloud.user.id) !== prev){
+      if(cloud.user) setTimeout(pull, 0); else setStatus("signedout");
+      paintSync();
+    }
+  });
+}
+async function pull(){
+  if(!cloud.client || !cloud.user) return;
+  if(!navigator.onLine) return setStatus("offline");
+  setStatus("syncing");
+  const {data, error} = await cloud.client.from("hub_state").select("data,updated_at").eq("user_id", cloud.user.id).maybeSingle();
+  if(error) return setStatus("error", error.message);
+  if(data && data.data){
+    const remoteAt = Date.parse(data.updated_at) || 0;
+    if(remoteAt >= (state.updatedAt || 0)){
+      state = normalise(data.data); state.updatedAt = remoteAt; saveLocal(); cloud.dirty = false; render(); return setStatus("synced");
+    }
+  }
+  return push();
+}
+async function push(){
+  clearTimeout(cloud.timer);
+  if(!cloud.client || !cloud.user) return;
+  if(!navigator.onLine) return setStatus("offline");
+  setStatus("syncing");
+  const at = state.updatedAt || Date.now();
+  const {error} = await cloud.client.from("hub_state").upsert({user_id:cloud.user.id, data:state, updated_at:new Date(at).toISOString()});
+  if(error){ cloud.dirty = true; return setStatus("error", error.message); }
+  cloud.dirty = false; setStatus("synced");
+}
+function schedulePush(){ if(!cloud.user) return; cloud.dirty = true; clearTimeout(cloud.timer); cloud.timer = setTimeout(push, 1200); }
+window.addEventListener("online", ()=>{ cloud.dirty ? push() : pull(); });
+window.addEventListener("offline", ()=>{ if(cloud.user) setStatus("offline"); });
+document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState === "visible" && cloud.user){ cloud.dirty ? push() : pull(); } });
+
+function paintSync(){
+  const p = document.getElementById("syncPanel"); if(!p) return;
+  const head = `<h2>Cloud sync</h2>`;
+  if(!configured){ p.innerHTML = head + `<p class="note">Cloud sync isn't set up yet. Create a free Supabase project, add its URL and key to <span class="num">config.js</span>, and redeploy. The README has the steps. Until then your data is saved on this device only.</p>`; return; }
+  if(!cloud.client){ p.innerHTML = head + `<p class="note">${cloud.status === "connecting" ? "Connecting to your database…" : "Cloud sync couldn't start. Check your internet connection and reopen the app. Your data is still saved on this device."}</p>`; return; }
+  if(!cloud.user){
+    p.innerHTML = head + `<p class="note">Sign in to save your data to your database and use it on your phone and laptop.</p>
+    <form id="authForm" class="fields" novalidate>
+      <label>Email<input id="a-email" type="email" autocomplete="username" required></label>
+      <label>Password<input id="a-pass" type="password" autocomplete="current-password" minlength="8" required></label>
+      <div class="row"><button class="btn primary" type="submit" data-auth="in">Sign in</button><button class="btn" type="submit" data-auth="up">Create account</button></div>
+    </form><p class="note" id="authMsg" role="status"></p>`;
+    return;
+  }
+  p.innerHTML = head + `<p>Signed in as <strong>${esc(cloud.user.email)}</strong>. Changes save to your database automatically and appear on your other devices when you open the app.</p>
+    <p class="note" id="syncLine" role="status">${statusText()}</p>
+    <div class="row"><button class="btn" data-act="sync-now">Sync now</button><button class="btn" data-act="sign-out">Sign out</button></div>`;
+}
+
+const $ = (s,el=document)=>el.querySelector(s);
+const esc = s => String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const aud = n => (n<0?"−":"")+"$"+Math.abs(Math.round(n||0)).toLocaleString("en-AU");
+const safeUrl = u => /^https?:\/\//i.test(u||"") ? u : "";
+const host = u => { try{ return new URL(u).hostname.replace(/^www\./,""); }catch(e){ return u; } };
+const fmtDate = d => d ? new Date(d+"T00:00:00").toLocaleDateString("en-AU",{day:"numeric",month:"short",year:"numeric"}) : "—";
+function toast(msg){ const t=document.createElement("div"); t.className="toast"; t.textContent=msg; t.setAttribute("role","status"); document.body.appendChild(t); setTimeout(()=>t.remove(),2200); }
+
+function clearExamples(){
+  state.jobs = state.jobs.filter(j=>!j.example);
+  state.pkg.rows = state.pkg.rows.filter(r=>!r.example);
+  state.docs = state.docs.filter(d=>!d.example);
+  state.examples = false; save(); render(); toast("Examples cleared");
+}
+function exampleBanner(){
+  if(!state.examples) return "";
+  return `<div class="example-note"><span>You're looking at <strong>example data</strong>. Add your own entries, then clear the examples.</span><button class="btn small" data-act="clear-examples">Clear examples</button></div>`;
+}
+
+/* ---------- Package maths ---------- */
+function pkgTotals(){
+  const rows = state.pkg.rows;
+  const gross = rows.reduce((a,r)=>a+(+r.gross||0),0);
+  const received = rows.reduce((a,r)=>a+(+r.received||0),0);
+  const pending = rows.filter(r=>!(+r.received)).reduce((a,r)=>a+(+r.gross||0),0);
+  return {gross,received,diff:gross-received,pending};
+}
+function taxFree(){ const y = Math.max(0,Math.floor(+state.pkg.years||0)); return ATO.base + ATO.perYear*y; }
+
+/* ---------- Views ---------- */
+const views = {
+home(){
+  const t = pkgTotals();
+  const counts = Object.fromEntries(STATUSES.map(s=>[s,state.jobs.filter(j=>j.status===s).length]));
+  const active = state.jobs.filter(j=>ACTIVE.includes(j.status));
+  const interviews = state.jobs.reduce((a,j)=>a+(+j.interviews||0),0);
+  const pct = t.gross ? Math.round(t.received/t.gross*100) : 0;
+  const colors = {Interested:"var(--muted)",Applied:"var(--info)",Interviewing:"var(--gold)",Offer:"var(--good)",Rejected:"var(--bad)",Withdrawn:"var(--line)"};
+  const total = state.jobs.length || 1;
+  const focus = [...state.jobs].filter(j=>j.status==="Offer"||j.status==="Interviewing").sort((a,b)=>(b.status==="Offer")-(a.status==="Offer"));
+  return `
+  <div class="head"><div><span class="eyebrow">${new Date().toLocaleDateString("en-AU",{weekday:"long",day:"numeric",month:"long"})}</span><h1>Where things stand</h1>
+  <p class="lede">Your package, your pipeline and your materials in one place. Saved on this device, and to your database when you're signed in.</p></div></div>
+  ${exampleBanner()}
+  <section class="ledger" aria-label="Summary">
+    <div class="cell"><span class="eyebrow">Package gross</span><span class="big">${aud(t.gross)}</span><span class="muted">${state.pkg.rows.length} components</span></div>
+    <div class="cell"><span class="eyebrow">Received so far</span><span class="big">${aud(t.received)}</span><span class="muted">${pct}% of gross</span></div>
+    <div class="cell"><span class="eyebrow">Active applications</span><span class="big">${active.length}</span><span class="muted">${counts.Offer} offer${counts.Offer===1?"":"s"} · ${counts.Interviewing} interviewing</span></div>
+    <div class="cell"><span class="eyebrow">Interviews done</span><span class="big">${interviews}</span><span class="muted">across ${state.jobs.length} roles</span></div>
+  </section>
+  <div class="grid2">
+    <section class="panel">
+      <div class="row" style="justify-content:space-between"><h2>Pipeline</h2><button class="btn small" data-go="jobs">Open tracker</button></div>
+      <div class="bar" role="img" aria-label="Applications by status">${STATUSES.filter(s=>counts[s]).map(s=>`<span style="width:${counts[s]/total*100}%;background:${colors[s]}"></span>`).join("")}</div>
+      <div class="legend">${STATUSES.map(s=>`<span><i style="background:${colors[s]}"></i>${s} <span class="num">${counts[s]}</span></span>`).join("")}</div>
+      <div class="list">${focus.length?focus.slice(0,4).map(j=>`<div><span><strong>${esc(j.company)}</strong><br><span class="muted">${esc(j.role)}</span></span><span class="pill s-${j.status}">${j.status}</span></div>`).join(""):`<p class="muted">No interviews or offers yet. Add roles in the Jobs Tracker as you apply.</p>`}</div>
+    </section>
+    <section class="panel">
+      <div class="row" style="justify-content:space-between"><h2>Package</h2><button class="btn small" data-go="resources">Open package</button></div>
+      <div class="bar" role="img" aria-label="${pct}% of gross received"><span style="width:${Math.min(100,pct)}%;background:var(--accent)"></span></div>
+      <div class="list">
+        <div><span>Gross package</span><span class="num">${aud(t.gross)}</span></div>
+        <div><span>Received in your account</span><span class="num">${aud(t.received)}</span></div>
+        <div><span>Tax and deductions</span><span class="num">${aud(t.gross-t.received-t.pending)}</span></div>
+        <div><span>Still to be paid</span><span class="num">${aud(t.pending)}</span></div>
+        <div><span>Tax-free redundancy limit (${ATO.year})</span><span class="num">${aud(taxFree())}</span></div>
+      </div>
+    </section>
+  </div>`;
+},
+
+jobs(){
+  const f = ui.filter, q = ui.q.toLowerCase();
+  const list = state.jobs.filter(j=>(f==="All"||(f==="Active"?ACTIVE.includes(j.status):j.status===f)) && (!q || (j.company+" "+j.role+" "+j.notes).toLowerCase().includes(q)))
+    .sort((a,b)=>STATUSES.indexOf(a.status)-STATUSES.indexOf(b.status) || (b.date||"").localeCompare(a.date||""));
+  const chips = ["All","Active",...STATUSES].map(s=>{
+    const n = s==="All"?state.jobs.length:s==="Active"?state.jobs.filter(j=>ACTIVE.includes(j.status)).length:state.jobs.filter(j=>j.status===s).length;
+    return `<button class="chip" data-filter="${s}" aria-pressed="${f===s}">${s}<span class="n">${n}</span></button>`;}).join("");
+  const opts = cur => STATUSES.map(s=>`<option ${s===cur?"selected":""}>${s}</option>`).join("");
+  const stepper = j => `<span class="stepper" aria-label="Interviews"><button data-int="-1" data-id="${j.id}" aria-label="One fewer interview">−</button><output>${+j.interviews||0}</output><button data-int="1" data-id="${j.id}" aria-label="One more interview">+</button></span>`;
+  const link = j => safeUrl(j.url)?`<a href="${esc(j.url)}" target="_blank" rel="noopener">${esc(host(j.url))}</a>`:`<span class="muted">—</span>`;
+  const empty = `<div class="empty"><strong>${state.jobs.length?"No jobs match this filter.":"No jobs tracked yet."}</strong><span>${state.jobs.length?"Try another status or clear the search.":"Add the first role you're interested in or have applied for."}</span>${state.jobs.length?"":`<button class="btn primary" data-act="add-job">Add job</button>`}</div>`;
+  return `
+  <div class="head"><div><span class="eyebrow">Jobs Tracker</span><h1>Applications</h1><p class="lede">Company, role, interviews and status for every opportunity. Change status inline and tap + after each interview.</p></div>
+  <button class="btn primary" data-act="add-job">+ Add job</button></div>
+  ${exampleBanner()}
+  <div class="toolbar">${chips}</div>
+  <div class="toolbar"><input class="search" id="jobSearch" type="search" placeholder="Search company, role or notes" value="${esc(ui.q)}" aria-label="Search jobs"></div>
+  <div class="tablewrap jobs">${list.length?`<table><thead><tr><th>Company / role</th><th>Status</th><th>Interviews</th><th>Applied</th><th>Link</th><th></th></tr></thead><tbody>
+    ${list.map(j=>`<tr><td class="co">${esc(j.company)}${j.example?' <span class="muted" style="font-weight:400;font-size:.8rem">(example)</span>':""}<span class="sub">${esc(j.role)}</span></td>
+    <td><select data-status="${j.id}" aria-label="Status for ${esc(j.company)}">${opts(j.status)}</select></td>
+    <td>${stepper(j)}</td><td class="num" style="white-space:nowrap">${fmtDate(j.date)}</td><td class="urlcell">${link(j)}</td>
+    <td><button class="btn small" data-edit="${j.id}">Edit</button></td></tr>`).join("")}</tbody></table>`:empty}</div>
+  <div class="cards">${list.length?list.map(j=>`<article class="card"><div class="card-top"><div><strong>${esc(j.company)}</strong>${j.example?' <span class="muted" style="font-size:.8rem">(example)</span>':""}<br><span class="muted">${esc(j.role)}</span></div><span class="pill s-${j.status}">${j.status}</span></div>
+    <div class="row" style="justify-content:space-between"><span class="row"><span class="muted" style="font-size:.85rem">Interviews</span>${stepper(j)}</span><span class="muted num" style="font-size:.85rem">${fmtDate(j.date)}</span></div>
+    ${j.notes?`<p style="font-size:.92rem">${esc(j.notes)}</p>`:""}
+    <div class="row" style="justify-content:space-between"><select data-status="${j.id}" aria-label="Status for ${esc(j.company)}" style="width:auto">${opts(j.status)}</select><span class="row">${safeUrl(j.url)?`<a class="btn small" href="${esc(j.url)}" target="_blank" rel="noopener">Open ad</a>`:""}<button class="btn small" data-edit="${j.id}">Edit</button></span></div></article>`).join(""):empty}</div>`;
+},
+
+resources(){
+  const t = pkgTotals(), tf = taxFree();
+  const red = state.pkg.rows.filter(r=>r.kind==="Redundancy pay").reduce((a,r)=>a+(+r.gross||0),0);
+  const kindOpts = cur => COMPONENTS.map(k=>`<option ${k===cur?"selected":""}>${k}</option>`).join("");
+  return `
+  <div class="head"><div><span class="eyebrow">Resources</span><h1>Package and candidate pack</h1><p class="lede">Record each part of your payout as the gross amount on your separation letter and the amount that actually reached your account.</p></div></div>
+  ${exampleBanner()}
+  <section class="panel">
+    <div class="row" style="justify-content:space-between"><h2>Redundancy package</h2><button class="btn small" data-act="add-row">+ Add component</button></div>
+    <div class="tablewrap pkg" style="border:0;border-radius:0"><table>
+      <thead><tr><th>Component</th><th>Type</th><th class="r">Gross</th><th class="r">Received</th><th class="r">Difference</th><th></th></tr></thead>
+      <tbody>${state.pkg.rows.map(r=>{const d=(+r.gross||0)-(+r.received||0);return `<tr>
+        <td><input data-row="${r.id}" data-k="label" value="${esc(r.label)}" aria-label="Component name"></td>
+        <td><select data-row="${r.id}" data-k="kind" aria-label="Component type">${kindOpts(r.kind)}</select></td>
+        <td class="money"><input data-row="${r.id}" data-k="gross" type="number" inputmode="decimal" step="0.01" value="${r.gross??""}" aria-label="Gross amount"></td>
+        <td class="money"><input data-row="${r.id}" data-k="received" type="number" inputmode="decimal" step="0.01" value="${r.received??""}" aria-label="Received amount"></td>
+        <td class="diff num" data-diff="${r.id}">${+r.received?aud(d):'<span class="muted">pending</span>'}</td>
+        <td><button class="btn small icon danger" data-delrow="${r.id}" aria-label="Remove ${esc(r.label)}">×</button></td></tr>`;}).join("") || `<tr><td colspan="6" class="muted">No components yet. Add each line from your separation letter.</td></tr>`}</tbody>
+      <tfoot><tr><td colspan="2">Total</td><td class="num" style="text-align:right" id="tGross">${aud(t.gross)}</td><td class="num" style="text-align:right" id="tRec">${aud(t.received)}</td><td class="num" style="text-align:right" id="tDiff">${aud(t.gross-t.received-t.pending)}</td><td></td></tr></tfoot>
+    </table></div>
+    <p class="note">Difference is tax and other deductions withheld. Components with nothing received yet show as pending and count toward “Still to be paid” on Home (<span class="num" id="tPend">${aud(t.pending)}</span>).</p>
+  </section>
+
+  <section class="panel">
+    <h2>Tax-free redundancy estimate</h2>
+    <p class="note">For a genuine redundancy, part of the redundancy payment is tax-free up to a limit set by the ATO each income year. Leave, notice and bonus payments are taxed separately. Use this as a guide only and check with the ATO or a tax adviser.</p>
+    <div class="calc">
+      <label>Completed years of service<input id="yrs" type="number" min="0" step="1" value="${+state.pkg.years||0}"></label>
+      <label>Income year<input value="${ATO.year}" disabled></label>
+    </div>
+    <div class="calc-out">
+      <div><span class="eyebrow">Tax-free limit</span><strong id="tfLimit">${aud(tf)}</strong><span class="muted num" style="font-size:.85rem">${aud(ATO.base)} + ${aud(ATO.perYear)} × years</span></div>
+      <div><span class="eyebrow">Redundancy pay entered</span><strong id="tfRed">${aud(red)}</strong></div>
+      <div><span class="eyebrow">Tax-free portion</span><strong id="tfPart">${aud(Math.min(red,tf))}</strong></div>
+      <div><span class="eyebrow">Above the limit</span><strong id="tfOver">${aud(Math.max(0,red-tf))}</strong><span class="muted" style="font-size:.85rem">Taxed as an employment termination payment</span></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="row" style="justify-content:space-between"><h2>Candidate pack</h2><button class="btn small" data-act="add-doc">+ Add item</button></div>
+    <p class="note">Keep links to the current version of each document so you can send the right one quickly.</p>
+    <div class="docs">${state.docs.map(d=>`<article class="doc"><span class="type">${esc(d.type)}${d.example?" · example":""}</span><h3>${esc(d.title)}</h3>${d.notes?`<p>${esc(d.notes)}</p>`:""}<span class="muted num" style="font-size:.8rem">Updated ${fmtDate(d.updated)}</span>
+      <div class="row">${safeUrl(d.url)?`<a class="btn small" href="${esc(d.url)}" target="_blank" rel="noopener">Open</a>`:""}<button class="btn small" data-editdoc="${d.id}">Edit</button></div></article>`).join("") || `<p class="muted">No items yet. Add your CV, cover letters and referees.</p>`}</div>
+  </section>
+
+  <section class="panel">
+    <h2>Useful links</h2>
+    <div class="links">
+      <a href="https://www.ato.gov.au/" target="_blank" rel="noopener"><span>Australian Taxation Office</span><span>Search “genuine redundancy” and “ETP”</span></a>
+      <a href="https://www.fairwork.gov.au/ending-employment/redundancy" target="_blank" rel="noopener"><span>Fair Work Ombudsman — Redundancy</span><span>Entitlements and redundancy pay scale</span></a>
+      <a href="https://www.servicesaustralia.gov.au/" target="_blank" rel="noopener"><span>Services Australia</span><span>Support while between jobs</span></a>
+      <a href="https://moneysmart.gov.au/" target="_blank" rel="noopener"><span>Moneysmart</span><span>Managing a lump sum and super</span></a>
+    </div>
+  </section>`;
+},
+
+about(){
+  return `
+  <div class="head"><div><span class="eyebrow">About</span><h1>About Redundancy Hub</h1></div></div>
+  <section class="panel about">
+    <p>Redundancy Hub helps you manage the practical side of a redundancy: what your package is worth on paper versus what reaches your bank account, which roles you're pursuing, and the documents you send to employers.</p>
+    <p>Your data is always saved on this device. When you sign in to cloud sync it is also saved to your own Supabase database, where only your account can read it, so you can use the app on your phone and laptop and it survives clearing your browser.</p>
+    <p>Install it like an app: on iPhone, open the site in Safari and choose Share → Add to Home Screen. On Android or desktop Chrome and Edge, use the Install option in the address bar or menu. It works offline once installed.</p>
+  </section>
+  <section class="panel" id="syncPanel"></section>
+  <section class="panel backup">
+    <h2>Backup and restore</h2>
+    <p class="note">Download a backup file, or copy the backup text and keep it somewhere safe. To restore, choose a backup file or paste the text and select Restore.</p>
+    <div class="row"><button class="btn primary" data-act="export">Download backup</button><button class="btn" data-act="copy">Copy backup text</button>
+      <label class="btn" style="flex-direction:row;color:var(--ink);font-size:.92rem">Choose backup file<input id="importFile" type="file" accept="application/json,.json" hidden></label></div>
+    <label>Backup text<textarea id="backupText" spellcheck="false" placeholder="Paste backup text here to restore"></textarea></label>
+    <div class="row"><button class="btn" data-act="restore">Restore from text</button><span id="resetWrap"><button class="btn danger" data-act="reset">Delete all data</button></span></div>
+  </section>
+  <p class="note">Tax-free limits shown are the ATO's ${ATO.year} figures. This app gives general information, not financial or tax advice.</p>`;
+}
+};
+
+const ui = {view:"home", filter:"All", q:""};
+
+function render(){
+  const main = $("#main");
+  main.innerHTML = `<div class="view">${views[ui.view]()}</div>`;
+  document.querySelectorAll(".tab").forEach(t=>t.setAttribute("aria-current", t.dataset.view===ui.view?"page":"false"));
+  if(ui.view==="about"){ $("#backupText").value = ""; paintSync(); }
+}
+function go(v){
+  if(!views[v]) v="home";
+  if(ui.view!==v){ ui.view=v; render(); window.scrollTo(0,0); }
+  if(location.hash.slice(1)!==v){ try{ history.replaceState(null,"","#"+v); }catch(e){ location.hash=v; } }
+}
+
+/* ---------- Jobs dialog ---------- */
+const jobDlg = $("#jobDlg"); let editingJob = null;
+$("#j-status").innerHTML = STATUSES.map(s=>`<option>${s}</option>`).join("");
+function openJob(id){
+  editingJob = id ? state.jobs.find(j=>j.id===id) : null;
+  const j = editingJob || {company:"",role:"",status:"Applied",interviews:0,date:today(),contact:"",url:"",notes:""};
+  $("#jobDlgTitle").textContent = editingJob ? "Edit job" : "Add job";
+  $("#j-company").value=j.company; $("#j-role").value=j.role; $("#j-status").value=j.status;
+  $("#j-interviews").value=j.interviews||0; $("#j-date").value=j.date||""; $("#j-contact").value=j.contact||"";
+  $("#j-url").value=j.url||""; $("#j-notes").value=j.notes||"";
+  $("#j-delwrap").innerHTML = editingJob ? `<button type="button" class="btn danger" data-act="del-job">Delete</button>` : "";
+  jobDlg.showModal(); $("#j-company").focus();
+}
+$("#jobForm").addEventListener("submit", e=>{
+  e.preventDefault();
+  const data = {company:$("#j-company").value.trim(),role:$("#j-role").value.trim(),status:$("#j-status").value,
+    interviews:Math.max(0,parseInt($("#j-interviews").value)||0),date:$("#j-date").value,contact:$("#j-contact").value.trim(),
+    url:$("#j-url").value.trim(),notes:$("#j-notes").value.trim()};
+  if(editingJob){ Object.assign(editingJob,data); delete editingJob.example; toast("Job updated"); }
+  else { state.jobs.push({id:uid(),...data}); toast("Job added"); }
+  save(); jobDlg.close(); render();
+});
+$("#j-cancel").addEventListener("click",()=>jobDlg.close());
+$("#j-delwrap").addEventListener("click", e=>{
+  const b=e.target.closest("button"); if(!b) return;
+  if(b.dataset.act==="del-job"){ $("#j-delwrap").innerHTML=`<span class="confirm">Delete this job? <button type="button" class="btn small danger" data-act="del-job-yes">Delete</button><button type="button" class="btn small" data-act="del-job-no">Keep</button></span>`; }
+  if(b.dataset.act==="del-job-no"){ $("#j-delwrap").innerHTML=`<button type="button" class="btn danger" data-act="del-job">Delete</button>`; }
+  if(b.dataset.act==="del-job-yes"){ state.jobs=state.jobs.filter(j=>j!==editingJob); save(); jobDlg.close(); render(); toast("Job deleted"); }
+});
+
+/* ---------- Doc dialog ---------- */
+const docDlg = $("#docDlg"); let editingDoc = null;
+$("#d-type").innerHTML = DOC_TYPES.map(s=>`<option>${s}</option>`).join("");
+function openDoc(id){
+  editingDoc = id ? state.docs.find(d=>d.id===id) : null;
+  const d = editingDoc || {title:"",type:"CV",url:"",notes:""};
+  $("#docDlgTitle").textContent = editingDoc ? "Edit item" : "Add item";
+  $("#d-title").value=d.title; $("#d-type").value=d.type; $("#d-url").value=d.url||""; $("#d-notes").value=d.notes||"";
+  $("#d-delwrap").innerHTML = editingDoc ? `<button type="button" class="btn danger" data-act="del-doc">Delete</button>` : "";
+  docDlg.showModal(); $("#d-title").focus();
+}
+$("#docForm").addEventListener("submit", e=>{
+  e.preventDefault();
+  const data = {title:$("#d-title").value.trim(),type:$("#d-type").value,url:$("#d-url").value.trim(),notes:$("#d-notes").value.trim(),updated:today()};
+  if(editingDoc){ Object.assign(editingDoc,data); delete editingDoc.example; } else state.docs.push({id:uid(),...data});
+  save(); docDlg.close(); render(); toast("Saved");
+});
+$("#d-cancel").addEventListener("click",()=>docDlg.close());
+$("#d-delwrap").addEventListener("click", e=>{
+  const b=e.target.closest("button"); if(!b) return;
+  if(b.dataset.act==="del-doc"){ $("#d-delwrap").innerHTML=`<span class="confirm">Delete? <button type="button" class="btn small danger" data-act="del-doc-yes">Delete</button><button type="button" class="btn small" data-act="del-doc-no">Keep</button></span>`; }
+  if(b.dataset.act==="del-doc-no"){ $("#d-delwrap").innerHTML=`<button type="button" class="btn danger" data-act="del-doc">Delete</button>`; }
+  if(b.dataset.act==="del-doc-yes"){ state.docs=state.docs.filter(d=>d!==editingDoc); save(); docDlg.close(); render(); toast("Deleted"); }
+});
+
+/* ---------- Backup ---------- */
+function backupJson(){ return JSON.stringify({app:"redundancy-hub",version:1,exported:new Date().toISOString(),data:state},null,2); }
+function restore(text){
+  try{ const o = JSON.parse(text); const d = o.data || o; if(!Array.isArray(d.jobs)) throw 0;
+    state = normalise(d); save(); render(); toast("Backup restored"); }
+  catch(e){ toast("That isn't a Redundancy Hub backup. Check the file or text and try again."); }
+}
+
+/* ---------- Events ---------- */
+document.querySelector(".tabs").addEventListener("click", e=>{ const t=e.target.closest(".tab"); if(t) go(t.dataset.view); });
+window.addEventListener("hashchange", ()=>go(location.hash.slice(1)));
+
+const main = $("#main");
+main.addEventListener("click", async e=>{
+  const b = e.target.closest("button,[data-go]"); if(!b) return;
+  if(b.dataset.go) return go(b.dataset.go);
+  if(b.dataset.filter){ ui.filter=b.dataset.filter; return render(); }
+  if(b.dataset.edit) return openJob(b.dataset.edit);
+  if(b.dataset.editdoc) return openDoc(b.dataset.editdoc);
+  if(b.dataset.int){ const j=state.jobs.find(x=>x.id===b.dataset.id); j.interviews=Math.max(0,(+j.interviews||0)+(+b.dataset.int));
+    if(+b.dataset.int>0 && (j.status==="Applied"||j.status==="Interested")) j.status="Interviewing"; save(); return render(); }
+  if(b.dataset.delrow){ state.pkg.rows=state.pkg.rows.filter(r=>r.id!==b.dataset.delrow); save(); return render(); }
+  switch(b.dataset.act){
+    case "add-job": return openJob();
+    case "add-doc": return openDoc();
+    case "clear-examples": return clearExamples();
+    case "add-row": state.pkg.rows.push({id:uid(),kind:"Other",label:"New component",gross:0,received:0}); save(); render();
+      const ins = main.querySelectorAll('.pkg input[data-k="label"]'); ins[ins.length-1]?.select(); return;
+    case "export": {
+      try{ const blob=new Blob([backupJson()],{type:"application/json"}); const a=document.createElement("a");
+        a.href=URL.createObjectURL(blob); a.download=`redundancy-hub-backup-${today()}.json`; document.body.appendChild(a); a.click(); a.remove();
+        toast("Backup downloaded"); }catch(err){}
+      $("#backupText").value = backupJson(); return; }
+    case "copy": { const t=$("#backupText"); t.value=backupJson();
+      try{ await navigator.clipboard.writeText(t.value); toast("Backup copied"); }catch(err){ t.focus(); t.select(); toast("Text selected. Copy it to save."); } return; }
+    case "restore": return restore($("#backupText").value);
+    case "sync-now": return pull();
+    case "sign-out": try{ await cloud.client.auth.signOut(); toast("Signed out. Your data stays on this device."); }catch(err){} return;
+    case "reset": $("#resetWrap").innerHTML=`<span class="confirm">Delete every job, package line and document${cloud.user?" on this device and in your database":""}?<button class="btn small danger" data-act="reset-yes">Delete all</button><button class="btn small" data-act="reset-no">Keep</button></span>`; return;
+    case "reset-no": return render();
+    case "reset-yes": state={examples:false,jobs:[],pkg:{years:0,rows:[]},docs:[]}; save(); render(); return toast("All data deleted");
+  }
+});
+main.addEventListener("submit", async e=>{
+  if(e.target.id !== "authForm") return;
+  e.preventDefault();
+  const mode = (e.submitter && e.submitter.dataset.auth) || "in";
+  const email = $("#a-email").value.trim(), password = $("#a-pass").value, msg = $("#authMsg");
+  if(!email || password.length < 8){ msg.textContent = "Enter your email and a password of at least 8 characters."; return; }
+  msg.textContent = mode === "up" ? "Creating your account…" : "Signing in…";
+  try{
+    if(mode === "up"){
+      const {data, error} = await cloud.client.auth.signUp({email, password, options:{emailRedirectTo: location.origin + location.pathname}});
+      if(error) throw error;
+      if(!data.session){ msg.textContent = "Account created. Open the confirmation email Supabase sent you, then come back here and sign in."; return; }
+    } else {
+      const {error} = await cloud.client.auth.signInWithPassword({email, password});
+      if(error) throw error;
+    }
+    toast("Signed in");
+  }catch(err){ msg.textContent = (err && err.message) || "Sign-in didn't work. Check your email and password and try again."; }
+});
+main.addEventListener("change", e=>{
+  const el=e.target;
+  if(el.dataset.status){ const j=state.jobs.find(x=>x.id===el.dataset.status); j.status=el.value; save(); render(); toast(`${j.company}: ${j.status}`); }
+  if(el.dataset.row && el.dataset.k==="kind"){ const r=state.pkg.rows.find(x=>x.id===el.dataset.row); r.kind=el.value; save(); render(); }
+  if(el.id==="importFile" && el.files[0]){ const fr=new FileReader(); fr.onload=()=>restore(fr.result); fr.readAsText(el.files[0]); }
+});
+main.addEventListener("input", e=>{
+  const el=e.target;
+  if(el.id==="jobSearch"){ ui.q=el.value; const pos=el.selectionStart; render(); const s=$("#jobSearch"); s.focus(); s.setSelectionRange(pos,pos); return; }
+  if(el.id==="yrs"){ state.pkg.years=el.value; save(); updatePkgFigures(); return; }
+  if(el.dataset.row){ const r=state.pkg.rows.find(x=>x.id===el.dataset.row); const k=el.dataset.k;
+    r[k] = (k==="gross"||k==="received") ? (el.value===""?0:+el.value) : el.value; save(); updatePkgFigures(); }
+});
+function updatePkgFigures(){
+  const t=pkgTotals(), tf=taxFree();
+  const red=state.pkg.rows.filter(r=>r.kind==="Redundancy pay").reduce((a,r)=>a+(+r.gross||0),0);
+  const set=(id,v)=>{const n=document.getElementById(id); if(n) n.textContent=v;};
+  set("tGross",aud(t.gross)); set("tRec",aud(t.received)); set("tDiff",aud(t.gross-t.received-t.pending)); set("tPend",aud(t.pending));
+  set("tfLimit",aud(tf)); set("tfRed",aud(red)); set("tfPart",aud(Math.min(red,tf))); set("tfOver",aud(Math.max(0,red-tf)));
+  state.pkg.rows.forEach(r=>{const c=main.querySelector(`[data-diff="${r.id}"]`); if(c) c.innerHTML = +r.received?aud((+r.gross||0)-(+r.received||0)):'<span class="muted">pending</span>';});
+}
+
+/* ---------- PWA ---------- */
+if("serviceWorker" in navigator && location.protocol.startsWith("http")){
+  window.addEventListener("load",()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
+}
+
+load();
+ui.view = views[location.hash.slice(1)] ? location.hash.slice(1) : "home";
+render();
+$("#syncBadge").addEventListener("click", ()=>go("about"));
+setStatus();
+cloudInit();
+})();
+</script>
+</body>
+</html>
